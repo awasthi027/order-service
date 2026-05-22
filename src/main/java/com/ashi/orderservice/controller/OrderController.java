@@ -6,7 +6,12 @@ import com.ashi.orderservice.dto.UpdateOrderRequest;
 import com.ashi.orderservice.entity.OrderStatus;
 import com.ashi.orderservice.service.OrderService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -63,11 +68,36 @@ public class OrderController {
     }
 
     @GetMapping("/search")
-    public List<OrderResponse> searchOrders(
+    public Page<OrderResponse> searchOrders(
             @RequestParam(required = false) String query,
-            @RequestParam(required = false) OrderStatus status
+            @RequestParam(required = false) String status,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return orderService.searchOrders(query, status);
+        return orderService.searchOrders(normalizeQuery(query), parseStatus(status), pageable);
+    }
+
+    private String normalizeQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        return query.trim();
+    }
+
+    private OrderStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+
+        String normalized = status.trim().replace("-", "").replace("_", "").toUpperCase();
+        return switch (normalized) {
+            case "CREATED" -> OrderStatus.CREATED;
+            case "PROCESSING", "INPROGRESS", "INPROGESS" -> OrderStatus.PROCESSING;
+            case "SHIPPED" -> OrderStatus.SHIPPED;
+            case "DELIVERED" -> OrderStatus.DELIVERED;
+            case "CANCELLED", "CANCELED" -> OrderStatus.CANCELLED;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid status. Allowed values: CREATED, PROCESSING, SHIPPED, DELIVERED, CANCELLED");
+        };
     }
 }
 

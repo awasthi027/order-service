@@ -1,16 +1,21 @@
 package com.ashi.orderservice.entity;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -24,10 +29,14 @@ public class Order {
     private String customerName;
 
     @Column(nullable = false)
-    private String productName;
+    private String address;
 
     @Column(nullable = false)
-    private Integer quantity;
+    private String paymentType;
+
+    @ElementCollection
+    @CollectionTable(name = "order_products", joinColumns = @JoinColumn(name = "order_id"))
+    private List<OrderProduct> products = new ArrayList<>();
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
@@ -76,20 +85,34 @@ public class Order {
         this.customerName = customerName;
     }
 
-    public String getProductName() {
-        return productName;
+    public String getAddress() {
+        return address;
     }
 
-    public void setProductName(String productName) {
-        this.productName = productName;
+    public void setAddress(String address) {
+        this.address = address;
     }
 
-    public Integer getQuantity() {
-        return quantity;
+    public String getPaymentType() {
+        return paymentType;
     }
 
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
+    public void setPaymentType(String paymentType) {
+        this.paymentType = paymentType;
+    }
+
+    public List<OrderProduct> getProducts() {
+        return products;
+    }
+
+    public void setProducts(List<OrderProduct> products) {
+        if (this.products == null) {
+            this.products = new ArrayList<>();
+        }
+        this.products.clear();
+        if (products != null) {
+            this.products.addAll(products);
+        }
     }
 
     public BigDecimal getTotalAmount() {

@@ -1,21 +1,16 @@
 package com.ashi.orderservice.dto;
 
 import com.ashi.orderservice.entity.OrderStatus;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.Valid;
 
-import java.math.BigDecimal;
+import java.util.List;
 
 public class UpdateOrderRequest {
 
     private String customerName;
-    private String productName;
-
-    @Min(1)
-    private Integer quantity;
-
-    @DecimalMin(value = "0.0", inclusive = false)
-    private BigDecimal totalAmount;
+    private String address;
+    private String paymentType;
+    private List<@Valid ProductRequest> products;
 
     private OrderStatus status;
 
@@ -27,28 +22,28 @@ public class UpdateOrderRequest {
         this.customerName = customerName;
     }
 
-    public String getProductName() {
-        return productName;
+    public String getAddress() {
+        return address;
     }
 
-    public void setProductName(String productName) {
-        this.productName = productName;
+    public void setAddress(String address) {
+        this.address = address;
     }
 
-    public Integer getQuantity() {
-        return quantity;
+    public String getPaymentType() {
+        return paymentType;
     }
 
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
+    public void setPaymentType(String paymentType) {
+        this.paymentType = paymentType;
     }
 
-    public BigDecimal getTotalAmount() {
-        return totalAmount;
+    public List<ProductRequest> getProducts() {
+        return products;
     }
 
-    public void setTotalAmount(BigDecimal totalAmount) {
-        this.totalAmount = totalAmount;
+    public void setProducts(List<ProductRequest> products) {
+        this.products = products;
     }
 
     public OrderStatus getStatus() {

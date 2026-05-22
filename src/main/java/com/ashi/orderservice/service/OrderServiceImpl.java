@@ -2,14 +2,22 @@ package com.ashi.orderservice.service;
 
 import com.ashi.orderservice.dto.OrderRequest;
 import com.ashi.orderservice.dto.OrderResponse;
+import com.ashi.orderservice.dto.ProductRequest;
+import com.ashi.orderservice.dto.ProductResponse;
 import com.ashi.orderservice.dto.UpdateOrderRequest;
 import com.ashi.orderservice.entity.Order;
+import com.ashi.orderservice.entity.OrderProduct;
 import com.ashi.orderservice.entity.OrderStatus;
+import com.ashi.orderservice.exception.InvalidOrderUpdateException;
 import com.ashi.orderservice.exception.ResourceNotFoundException;
 import com.ashi.orderservice.repository.OrderRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,9 +35,10 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse createOrder(OrderRequest request) {
         Order order = new Order();
         order.setCustomerName(request.getCustomerName());
-        order.setProductName(request.getProductName());
-        order.setQuantity(request.getQuantity());
-        order.setTotalAmount(request.getTotalAmount());
+        order.setAddress(request.getAddress());
+        order.setPaymentType(request.getPaymentType());
+        order.setProducts(toOrderProducts(request.getProducts()));
+        order.setTotalAmount(calculateTotalAmount(order.getProducts()));
         order.setStatus(OrderStatus.CREATED);
 
         return toResponse(orderRepository.save(order));
@@ -39,17 +48,24 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse updateOrder(UUID id, UpdateOrderRequest request) {
         Order order = findOrder(id);
 
+        validateOrderIsUpdatable(order);
+
+        if (request.getStatus() != null) {
+            validateRequestedStatusForUpdate(request.getStatus());
+        }
+
         if (request.getCustomerName() != null) {
             order.setCustomerName(request.getCustomerName());
         }
-        if (request.getProductName() != null) {
-            order.setProductName(request.getProductName());
+        if (request.getAddress() != null) {
+            order.setAddress(request.getAddress());
         }
-        if (request.getQuantity() != null) {
-            order.setQuantity(request.getQuantity());
+        if (request.getPaymentType() != null) {
+            order.setPaymentType(request.getPaymentType());
         }
-        if (request.getTotalAmount() != null) {
-            order.setTotalAmount(request.getTotalAmount());
+        if (request.getProducts() != null) {
+            order.setProducts(toOrderProducts(request.getProducts()));
+            order.setTotalAmount(calculateTotalAmount(order.getProducts()));
         }
         if (request.getStatus() != null) {
             order.setStatus(request.getStatus());
@@ -80,11 +96,24 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> searchOrders(String query, OrderStatus status) {
+    public Page<OrderResponse> searchOrders(String query, OrderStatus status, Pageable pageable) {
         String cleanedQuery = (query == null || query.isBlank()) ? null : query.trim();
-        return orderRepository.search(cleanedQuery, status).stream()
-                .map(this::toResponse)
-                .toList();
+        if (cleanedQuery == null && status == null) {
+            return orderRepository.findAll(pageable).map(this::toResponse);
+        }
+        return orderRepository.search(cleanedQuery, status, pageable).map(this::toResponse);
+    }
+
+    private void validateOrderIsUpdatable(Order order) {
+        if (order.getStatus() != OrderStatus.CREATED && order.getStatus() != OrderStatus.PROCESSING) {
+            throw new InvalidOrderUpdateException("Order can be updated only when status is CREATED or PROCESSING");
+        }
+    }
+
+    private void validateRequestedStatusForUpdate(OrderStatus status) {
+        if (status != OrderStatus.CREATED && status != OrderStatus.PROCESSING) {
+            throw new InvalidOrderUpdateException("Only CREATED or PROCESSING status is allowed in update request");
+        }
     }
 
     private Order findOrder(UUID id) {
@@ -96,13 +125,38 @@ public class OrderServiceImpl implements OrderService {
         return new OrderResponse(
                 order.getId(),
                 order.getCustomerName(),
-                order.getProductName(),
-                order.getQuantity(),
+                order.getAddress(),
+                order.getPaymentType(),
+                order.getProducts().stream()
+                        .map(product -> new ProductResponse(
+                                product.getProductId(),
+                                product.getProductName(),
+                                product.getPrice()
+                        ))
+                        .toList(),
                 order.getTotalAmount(),
                 order.getStatus(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );
+    }
+
+    private List<OrderProduct> toOrderProducts(List<ProductRequest> products) {
+        return products.stream()
+                .map(product -> {
+                    OrderProduct orderProduct = new OrderProduct();
+                    orderProduct.setProductId(product.getProductId());
+                    orderProduct.setProductName(product.getProductName());
+                    orderProduct.setPrice(product.getPrice());
+                    return orderProduct;
+                })
+                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+    }
+
+    private BigDecimal calculateTotalAmount(List<OrderProduct> products) {
+        return products.stream()
+                .map(OrderProduct::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
 
